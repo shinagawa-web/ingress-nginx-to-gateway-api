@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: echo
+        version: v1
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo:latest
+        args:
+        - -text=v1
+        - -listen=:8080
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-v1
+spec:
+  selector:
+    app: echo
+    version: v1
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: echo
+        version: v2
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo:latest
+        args:
+        - -text=v2
+        - -listen=:8080
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-v2
+spec:
+  selector:
+    app: echo
+    version: v2
+  ports:
+  - port: 8080
+    targetPort: 8080

@@ -1,0 +1,32 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: protected
+spec:
+  parentRefs:
+  - name: eg
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /protected
+    backendRefs:
+    - name: echo-v1
+      port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: auth
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: protected
+  extAuth:
+    http:
+      backendRefs:
+      - group: ""
+        kind: Service
+        name: auth-service
+        port: 80

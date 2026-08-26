@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: http://auth-service.default.svc.cluster.local/auth
+    nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-User
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /protected
+        pathType: Prefix
+        backend:
+          service:
+            name: echo-v1
+            port:
+              number: 8080

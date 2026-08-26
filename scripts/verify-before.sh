@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LIMA_INSTANCE=${LIMA_INSTANCE:-ingress-test}
+BASE_URL=http://localhost:8082
+
+export KUBECONFIG="$HOME/.lima/$LIMA_INSTANCE/copied-from-guest/kubeconfig.yaml"
+source "$(dirname "$0")/lib/tests.sh"
+
+if ! limactl list --format '{{.Name}}' | grep -q "^$LIMA_INSTANCE$"; then
+  echo "==> Creating Lima k3s instance: $LIMA_INSTANCE"
+  limactl start template://k3s --name "$LIMA_INSTANCE"
+else
+  echo "==> Using existing Lima instance: $LIMA_INSTANCE"
+fi
+
+echo "==> Installing ingress-nginx"
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/cloud/deploy.yaml
+kubectl wait --timeout=5m -n ingress-nginx deployment/ingress-nginx-controller --for=condition=Available
+kubectl wait --timeout=60s -n ingress-nginx job/ingress-nginx-admission-create job/ingress-nginx-admission-patch --for=condition=Complete
+kubectl wait --timeout=60s -n ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller
+kubectl patch configmap ingress-nginx-controller -n ingress-nginx --patch '{"data": {"limit-req-status-code": "429", "annotations-risk-level": "Critical"}}'
+kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type json \
+  -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-annotation-validation=false"}]'
+kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=3m
+
+echo "==> Starting port-forward"
+pkill -f "port-forward.*8082" 2>/dev/null || true
+sleep 1
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8082:80 &>/tmp/pf-ingress.log &
+sleep 3
+
+echo "==> Deploying sample app and auth-service"
+kubectl apply -f "$(dirname "$0")/../app/echo.yaml"
+kubectl apply -f "$(dirname "$0")/../app/auth-service.yaml"
+kubectl wait --timeout=2m deployment/echo-v1 deployment/echo-v2 deployment/auth-service --for=condition=Available
+
+echo "==> [before] basic routing"
+kubectl apply -f "$(dirname "$0")/../before/01-basic-routing.yaml"
+sleep 5
+test_basic_routing "$BASE_URL"
+
+echo "==> [before] rewrite"
+kubectl delete ingress basic-routing 2>/dev/null || true
+kubectl apply -f "$(dirname "$0")/../before/02-rewrite.yaml"
+sleep 5
+test_rewrite "$BASE_URL"
+
+echo "==> [before] canary"
+kubectl apply -f "$(dirname "$0")/../before/03-canary.yaml"
+sleep 5
+test_canary "$BASE_URL"
+
+echo "==> [before] auth"
+kubectl delete ingress canary-primary canary 2>/dev/null || true
+kubectl apply -f "$(dirname "$0")/../before/04-auth.yaml"
+sleep 5
+test_auth "$BASE_URL" 401
+
+echo "==> [before] rate-limit"
+kubectl delete ingress auth 2>/dev/null || true
+kubectl apply -f "$(dirname "$0")/../before/05-rate-limit.yaml"
+sleep 5
+test_rate_limit "$BASE_URL"
+
+echo "==> [before] configuration-snippet"
+kubectl delete ingress rate-limit 2>/dev/null || true
+kubectl apply -f "$(dirname "$0")/../before/06-configuration-snippet.yaml"
+sleep 5
+test_configuration_snippet "$BASE_URL"
+test_request_id "$BASE_URL"
+
+echo ""
+echo "All ingress-nginx tests passed."
+echo ""
+echo "To clean up: limactl stop $LIMA_INSTANCE && limactl delete $LIMA_INSTANCE"

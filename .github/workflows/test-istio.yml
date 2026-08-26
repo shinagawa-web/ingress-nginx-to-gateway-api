@@ -2,7 +2,7 @@ name: test-istio
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches: [main]
     paths:
       - 'after/category-b-istio/**'

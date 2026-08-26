@@ -70,7 +70,12 @@ test_canary "$BASE_URL"
 echo "==> [category-b] auth"
 kubectl delete httproute canary 2>/dev/null || true
 kubectl apply -f "$SCRIPT_DIR/../after/category-b-istio/04-auth.yaml"
-sleep 20
+echo "==> Waiting for AuthorizationPolicy to propagate"
+for i in $(seq 1 18); do
+  code=$(curl -so /dev/null -w "%{http_code}" -H "Host: app.example.com" "$BASE_URL/protected")
+  [ "$code" = "403" ] && break
+  sleep 5
+done
 test_auth "$BASE_URL" 403
 
 echo "==> [category-a] response header"

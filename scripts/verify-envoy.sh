@@ -56,12 +56,39 @@ echo "==> Applying Gateway"
 kubectl apply -f "$SCRIPT_DIR/../after/gateway-envoy.yaml"
 kubectl wait --timeout=3m gateway/eg --for=condition=Accepted
 
+echo "==> Waiting for envoy proxy pod to appear and be ready"
+for i in $(seq 1 36); do
+  READY=$(kubectl get pod -n envoy-gateway-system \
+    -l 'gateway.envoyproxy.io/owning-gateway-name=eg' \
+    -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+  echo "  attempt $i/36: Ready=$READY"
+  [ "$READY" = "True" ] && break
+  sleep 5
+done
+if [ "$READY" != "True" ]; then
+  echo "ERROR: envoy proxy pod did not become ready"
+  kubectl get pod -n envoy-gateway-system -o wide
+  exit 1
+fi
+
+echo "==> DEBUG: pods in envoy-gateway-system"
+kubectl get pod -n envoy-gateway-system -o wide
+echo "==> DEBUG: services in envoy-gateway-system"
+kubectl get svc -n envoy-gateway-system
+
 echo "==> Starting port-forward for Gateway"
 pkill -f "port-forward.*8080" 2>/dev/null || true
 sleep 2
 SVC=$(kubectl get svc -n envoy-gateway-system -l 'gateway.envoyproxy.io/owning-gateway-name=eg' -o jsonpath='{.items[0].metadata.name}')
+echo "==> DEBUG: SVC='$SVC'"
 kubectl port-forward -n envoy-gateway-system svc/"$SVC" 8080:80 &>/tmp/pf-envoy.log &
+PF_PID=$!
 sleep 5
+echo "==> DEBUG: port-forward pid=$PF_PID alive=$(kill -0 $PF_PID 2>&1 && echo yes || echo no)"
+echo "==> DEBUG: pf-envoy.log:"
+cat /tmp/pf-envoy.log || true
+echo "==> DEBUG: curl probe localhost:8080"
+curl --max-time 5 -v http://localhost:8080/ 2>&1 | head -20 || true
 
 echo "==> [category-a] basic routing"
 kubectl apply -f "$SCRIPT_DIR/../after/category-a/01-basic-routing.yaml"

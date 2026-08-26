@@ -26,16 +26,31 @@ kubectl wait --timeout=5m -n ingress-nginx deployment/ingress-nginx-controller -
 kubectl wait --timeout=60s -n ingress-nginx job/ingress-nginx-admission-create job/ingress-nginx-admission-patch --for=condition=Complete
 kubectl wait --timeout=60s -n ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller
 kubectl patch configmap ingress-nginx-controller -n ingress-nginx \
-  --patch '{"data": {"limit-req-status-code": "429", "annotations-risk-level": "Critical"}}'
+  --patch '{"data": {"limit-req-status-code": "429", "annotations-risk-level": "Critical", "allow-snippet-annotations": "true"}}'
 kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type json \
   -p '[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--enable-annotation-validation=false"}]'
 kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=3m
 
-echo "==> Starting port-forward"
-pkill -f "port-forward.*8082" 2>/dev/null || true
-sleep 1
-kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8082:80 &>/tmp/pf-ingress.log &
-sleep 5
+echo "==> DEBUG: controller args"
+kubectl get deployment ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.template.spec.containers[0].args}' | tr ',' '\n'
+echo ""
+echo "==> DEBUG: ConfigMap data"
+kubectl get configmap ingress-nginx-controller -n ingress-nginx -o jsonpath='{.data}' | python3 -m json.tool 2>/dev/null || kubectl get configmap ingress-nginx-controller -n ingress-nginx -o jsonpath='{.data}'
+echo ""
+echo "==> DEBUG: ValidatingWebhookConfiguration"
+kubectl get validatingwebhookconfiguration ingress-nginx-admission -o jsonpath='{.webhooks[0].failurePolicy}' 2>/dev/null || true
+echo ""
+
+if [ -z "${KUBECONFIG:-}" ]; then
+  echo "==> Starting port-forward"
+  pkill -f "port-forward.*8082" 2>/dev/null || true
+  sleep 1
+  kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8082:80 &>/tmp/pf-ingress.log &
+  sleep 5
+else
+  echo "==> Skipping port-forward (kind extraPortMapping handles 8082)"
+  sleep 2
+fi
 
 echo "==> Deploying sample app and auth-service"
 kubectl apply -f "$SCRIPT_DIR/../app/echo.yaml"

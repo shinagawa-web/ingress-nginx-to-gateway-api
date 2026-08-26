@@ -71,11 +71,14 @@ echo "==> [category-b] auth"
 kubectl delete httproute canary 2>/dev/null || true
 kubectl apply -f "$SCRIPT_DIR/../after/category-b-istio/04-auth.yaml"
 echo "==> Waiting for AuthorizationPolicy to propagate"
-for i in $(seq 1 18); do
-  code=$(curl -so /dev/null -w "%{http_code}" -H "Host: app.example.com" "$BASE_URL/protected")
+sleep 10
+for i in $(seq 1 36); do
+  code=$(curl --max-time 5 -so /dev/null -w "%{http_code}" -H "Host: app.example.com" "$BASE_URL/protected" || echo "000")
+  echo "  attempt $i/36: code=$code"
   [ "$code" = "403" ] && break
   sleep 5
 done
+echo "==> DEBUG: final code=$code"
 test_auth "$BASE_URL" 403
 
 echo "==> [category-a] response header"

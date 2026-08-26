@@ -34,7 +34,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/downloa
 echo "==> Installing Envoy Gateway"
 kubectl delete crd backendtlspolicies.gateway.networking.k8s.io tlsroutes.gateway.networking.k8s.io 2>/dev/null || true
 kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.3.0/install.yaml \
-  --force-conflicts 2>&1 || true
+  --force-conflicts
 kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
 
 echo "==> Enabling EnvoyPatchPolicy"
@@ -132,6 +132,6 @@ kubectl apply -f "$SCRIPT_DIR/../after/category-b-envoy-gateway/06-request-id.ya
 sleep 8
 test_request_id "$BASE_URL"
 
-pkill -f "port-forward.*8080" 2>/dev/null || true
+kill "$PF_PID" 2>/dev/null || true
 echo ""
 echo "All Envoy Gateway tests passed."

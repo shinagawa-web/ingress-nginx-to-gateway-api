@@ -10,11 +10,11 @@ Classifies ingress-nginx annotations into three categories and provides Gateway 
 | rewrite | ✓ | ✓ | — | — |
 | canary | ✓ | ✓ | — | — |
 | auth | ✓ | — | ✓ | ✓ |
-| rate-limit | ✓ | — | ✓ | — |
+| rate-limit | ✓ | — | ✓ | ✓ |
 | X-Custom-Header | ✓ | ✓ | — | — |
 | X-Request-ID | ✓ | — | ✓ | ✓ |
 
-- **category-a**: Migrates using Gateway API standard spec (HTTPRoute filters). The same manifest works across all implementations.
+- **category-a**: Migrates using Gateway API standard spec (HTTPRoute filters). The manifests reference `parentRefs.name: eg` (Envoy Gateway). When running with Istio, the verification script rewrites the name to match the Istio Gateway.
 - **category-b**: Migrates to implementation-specific CRDs. The approach depends on which implementation you choose.
 - **category-c**: No migration path exists. Most nginx directives in `configuration-snippet` fall here. Simple use cases like adding a static response header can be replaced with the standard `ResponseHeaderModifier` filter (category-a), but there is no structural equivalent for arbitrary nginx directives in Gateway API.
 
@@ -40,7 +40,7 @@ Classifies ingress-nginx annotations into three categories and provides Gateway 
 
 ## Local verification
 
-Requires `kind` and `kubectl`.
+Requires `limactl` and `kubectl`. Each script creates or reuses a Lima k3s instance by default. To run against an existing cluster, set `KUBECONFIG` before running the script.
 
 ```bash
 # ingress-nginx (before migration)
@@ -52,8 +52,6 @@ bash scripts/verify-envoy.sh
 # Istio (after migration)
 bash scripts/verify-istio.sh
 ```
-
-Each script handles cluster creation through test execution. A cleanup command is printed at the end.
 
 ## About auth-service
 

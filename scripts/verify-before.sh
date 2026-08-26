@@ -46,9 +46,11 @@ if [ -z "${KUBECONFIG:-}" ]; then
   pkill -f "port-forward.*8082" 2>/dev/null || true
   sleep 1
   kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8082:80 &>/tmp/pf-ingress.log &
+  PF_PID=$!
   sleep 5
 else
   echo "==> Skipping port-forward (kind extraPortMapping handles 8082)"
+  PF_PID=""
   sleep 2
 fi
 
@@ -92,6 +94,6 @@ sleep 5
 test_configuration_snippet "$BASE_URL"
 test_request_id "$BASE_URL"
 
-pkill -f "port-forward.*8082" 2>/dev/null || true
+[ -n "${PF_PID:-}" ] && kill "$PF_PID" 2>/dev/null || true
 echo ""
 echo "All ingress-nginx tests passed."

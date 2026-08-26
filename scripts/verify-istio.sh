@@ -59,9 +59,24 @@ pkill -f "port-forward.*8081" 2>/dev/null || true
 sleep 2
 GW_SVC=$(kubectl get svc -n default -l "gateway.networking.k8s.io/gateway-name=istio-gw" -o jsonpath='{.items[0].metadata.name}')
 kubectl port-forward svc/"$GW_SVC" 8081:80 &>/tmp/pf-istio.log &
+PF_PID=$!
 sleep 5
 
+echo "==> [category-a] basic routing"
+MANIFEST=$(sed 's/name: eg/name: istio-gw/' "$SCRIPT_DIR/../after/category-a/01-basic-routing.yaml")
+echo "$MANIFEST" | kubectl apply -f -
+sleep 5
+test_basic_routing "$BASE_URL"
+
+echo "==> [category-a] rewrite"
+kubectl delete httproute basic-routing 2>/dev/null || true
+MANIFEST=$(sed 's/name: eg/name: istio-gw/' "$SCRIPT_DIR/../after/category-a/02-rewrite.yaml")
+echo "$MANIFEST" | kubectl apply -f -
+sleep 5
+test_rewrite "$BASE_URL"
+
 echo "==> [category-a] canary"
+kubectl delete httproute rewrite 2>/dev/null || true
 CANARY=$(sed 's/name: eg/name: istio-gw/' "$SCRIPT_DIR/../after/category-a/03-canary.yaml")
 echo "$CANARY" | kubectl apply -f -
 sleep 5
@@ -95,6 +110,6 @@ kubectl apply -f "$SCRIPT_DIR/../after/category-b-istio/06-request-id.yaml"
 sleep 10
 test_request_id "$BASE_URL"
 
-pkill -f "port-forward.*8081" 2>/dev/null || true
+kill "$PF_PID" 2>/dev/null || true
 echo ""
 echo "All Istio tests passed."

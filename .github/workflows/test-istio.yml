@@ -1,0 +1,33 @@
+name: test-istio
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'after/category-b-istio/**'
+      - 'after/gateway-istio.yaml'
+      - 'scripts/verify-istio.sh'
+      - 'scripts/lib/tests.sh'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: kind/cluster-istio.yaml
+          cluster_name: istio-gw
+
+      - name: Install istioctl
+        run: |
+          curl -sL https://istio.io/downloadIstio | ISTIO_VERSION=1.24.0 sh -
+          echo "$HOME/istio-1.24.0/bin" >> $GITHUB_PATH
+
+      - name: Run Istio tests
+        env:
+          KUBECONFIG: /home/runner/.kube/config
+        run: bash scripts/verify-istio.sh

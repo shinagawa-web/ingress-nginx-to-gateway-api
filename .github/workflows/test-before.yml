@@ -1,0 +1,22 @@
+name: test-before
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: kind/cluster-before.yaml
+          cluster_name: ingress-nginx
+
+      - name: Run ingress-nginx tests
+        env:
+          KUBECONFIG: /home/runner/.kube/config
+        run: bash scripts/verify-before.sh

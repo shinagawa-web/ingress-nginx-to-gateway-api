@@ -30,3 +30,5 @@ spec:
         kind: Service
         name: auth-service
         port: 80
+      headersToBackend:
+      - x-auth-user

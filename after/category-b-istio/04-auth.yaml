@@ -25,10 +25,7 @@ spec:
       version: v1
   action: DENY
   rules:
-  - to:
-    - operation:
-        paths: ["/protected*"]
-    when:
+  - when:
     - key: request.headers[authorization]
       notValues:
       - "Bearer valid-token"

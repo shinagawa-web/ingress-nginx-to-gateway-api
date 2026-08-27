@@ -38,21 +38,6 @@ Classifies ingress-nginx annotations into three categories and provides Gateway 
     └── verify-istio.sh              # verify with Istio
 ```
 
-## Local verification
+## Verification
 
-Requires `limactl` and `kubectl`. Each script creates or reuses a Lima k3s instance by default. To run against an existing cluster, set `KUBECONFIG` before running the script.
-
-```bash
-# ingress-nginx (before migration)
-bash scripts/verify-before.sh
-
-# Envoy Gateway (after migration)
-bash scripts/verify-envoy.sh
-
-# Istio (after migration)
-bash scripts/verify-istio.sh
-```
-
-## About auth-service
-
-The auth tests in `before/04-auth.yaml` and `after/category-b-*/04-auth.yaml` require `app/auth-service.yaml` to be deployed. It returns 200 for requests with `Authorization: Bearer valid-token` and 401/403 otherwise. Replace with real JWT validation or OAuth token introspection in production.
+Manifests and scripts are verified automatically via GitHub Actions on every push.
